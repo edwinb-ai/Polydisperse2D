@@ -1,6 +1,6 @@
-function write_to_file(filepath, step, boxl, n_particles, positions, diameters)
+function write_to_file(filepath, step, boxl, n_particles, positions, diameters; mode="a")
     # Write to file
-    open(filepath, "a") do io
+    open(filepath, mode) do io
         println(io, n_particles)
         Printf.@printf(
             io,
@@ -27,6 +27,28 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters)
     end
 
     return nothing
+end
+
+function read_file(filepath)
+    open(filepath, "r") do io
+        # First line is the number of particles
+        line = readline(io)
+        n_particles = parse(Int64, line)
+
+        # The second line we can skip for now
+        _ = readline(io)
+        
+        # Now read each line and gather the information
+        positions = [@SVector(zeros(2)) for _ in 1:n_particles]
+        diameters = zeros(n_particles)
+
+        for i in 1:n_particles
+            line = split(readline(io), " ")
+            parsed_line = parse.(Float64, line)
+            positions[i] = SVector{2}(parsed_line[4:end])
+            diameters[i] = parsed_line[3]
+        end
+    end
 end
 
 function compress_gz(filepath)

@@ -1,7 +1,7 @@
 using Random
 using StaticArrays
 using LinearAlgebra: dot
-using DelimitedFiles: writedlm
+using DelimitedFiles: writedlm, readdlm
 using Printf
 using FastPow
 using Statistics: mean
@@ -167,7 +167,7 @@ function simulation(params::Parameters, pathname; eq_steps=100, prod_steps=500)
     # Write the final configuration
     final_configuration = joinpath(pathname, "final.xyz")
     write_to_file(
-        final_configuration, step, boxl, params.n_particles, system.positions, diameters
+        final_configuration, step, boxl, params.n_particles, system.positions, diameters; mode="w"
     )
 
     # Close all opened files
@@ -179,7 +179,7 @@ function simulation(params::Parameters, pathname; eq_steps=100, prod_steps=500)
 end
 
 function main()
-    densities = [0.96]
+    densities = [0.95]
     ktemp = 1.4671
     n_particles = 2^14
 
@@ -187,8 +187,9 @@ function main()
         params = Parameters(d, ktemp, n_particles)
         # Create a new directory with these parameters
         pathname = joinpath(@__DIR__, "N=$(n_particles)_density=$(@sprintf("%.4g", d))")
-        mkpath(pathname)
-        simulation(params, pathname; eq_steps=10_000_000, prod_steps=100_000_000)
+        # mkpath(pathname)
+        # simulation(params, pathname; eq_steps=10_000_000, prod_steps=100_000_000)
+        read_file(joinpath(pathname, "final.xyz"))
     end
 
     return nothing
