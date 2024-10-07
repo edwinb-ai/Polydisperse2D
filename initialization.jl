@@ -38,7 +38,7 @@ function initialize_diameters(n_particles, polydispersity)
     mean_diameter = 1.0
     diameters = zeros(n_particles)
     poly_dist = Normal(mean_diameter, polydispersity)
-    
+
     for i in 1:n_particles
         new_diameter = rand(poly_dist)
         # Make sure no diameters are larger than 1
@@ -47,13 +47,13 @@ function initialize_diameters(n_particles, polydispersity)
         end
         diameters[i] = new_diameter
     end
-    
+
     @info "Mean diameter: $(mean(diameters))"
 
     return diameters
 end
 
-function init_system(boxl, cutoff, pathname, diameters;n_particles=2^8)
+function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     # Define the size of the simulation box for the cell lists
     unitcell = [boxl, boxl]
 
@@ -78,6 +78,47 @@ function init_system(boxl, cutoff, pathname, diameters;n_particles=2^8)
     )
 
     return system, diameters
+end
+
+function initialize_simulation(params::Parameters; file="")
+    # Always leave a fixed cutoff
+    cutoff = 1.1
+    diameters = []
+    positions = []
+    boxl = 0.0
+    volume = 0.0
+    system = nothing
+    
+    if isfile(file)
+        @info "Reading from file..."
+        (boxl, positions, diameters) = read_file(file)
+        volume = boxl^2
+
+        # Initialize system
+        system = CellListMap.ParticleSystem(;
+            xpositions=positions,
+            unitcell=[boxl, boxl],
+            cutoff=cutoff,
+            output=EnergyAndForces(0.0, 0.0, similar(positions)),
+            output_name=:energy_and_forces,
+            parallel=false,
+        )
+    else
+        # For a polydisperse mixture, we need the diameters before anything else
+        polydispersity = 0.11
+        diameters = initialize_diameters(params.n_particles, polydispersity)
+
+        # Now we compute the effective size of the box
+        boxl = sqrt(sum(diameters .^ 2) / params.ρ)
+        volume = boxl^2
+        
+        # Initialize the system in a lattice configuration
+        (system, diameters) = init_system(
+            boxl, cutoff, pathname, diameters; n_particles=params.n_particles
+        )
+    end
+
+    return system, diameters, volume, boxl
 end
 
 function initialize_velocities(ktemp, nf, rng, n_particles)

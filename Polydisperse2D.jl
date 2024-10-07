@@ -11,12 +11,6 @@ using CellListMap
 import CellListMap: copy_output, reset_output!, reducer
 using Packmol: pack_monoatomic!
 
-include("initialization.jl")
-include("potentials.jl")
-include("thermostat.jl")
-include("pairwise.jl")
-include("io.jl")
-
 # Some numerical constants
 const b_param = 1.0204081632653061
 const a_param = 134.5526623421209
@@ -26,6 +20,12 @@ struct Parameters
     ktemp::Float64
     n_particles::Int
 end
+
+include("initialization.jl")
+include("potentials.jl")
+include("thermostat.jl")
+include("pairwise.jl")
+include("io.jl")
 
 function integrate_half(positions, velocities, forces, dt, boxl; pbc=true)
     # ! Important: There is a mass in the force term
@@ -39,17 +39,11 @@ function integrate_half(positions, velocities, forces, dt, boxl; pbc=true)
     return new_positions, new_velocities
 end
 
-function simulation(params::Parameters, pathname; eq_steps=100, prod_steps=500)
+function simulation(
+    params::Parameters, pathname; from_file="", eq_steps=100, prod_steps=500
+)
     rng = Random.Xoshiro()
 
-    # For a polydisperse mixture, we need the diameters before anything else
-    polydispersity = 0.11
-    diameters = initialize_diameters(params.n_particles, polydispersity)
-
-    # Now we compute the effective size of the box
-    boxl = sqrt(sum(diameters .^ 2) / params.ρ)
-    volume = boxl^2
-    cutoff = 1.1
     # Set the timestep and the damping constant for the thermostat
     dt = 0.0001
     τ = 100.0 * dt
@@ -63,10 +57,10 @@ function simulation(params::Parameters, pathname; eq_steps=100, prod_steps=500)
     nprom = 0
     kinetic_energy = 0.0
 
-    # Initialize the system in a lattice configuration
-    (system, diameters) = init_system(
-        boxl, cutoff, pathname, diameters; n_particles=params.n_particles
-    )
+    # Initialize the system
+    (system, diameters, volume, boxl) = initialize_simulation(params; file=from_file)
+    @show diameters
+
     # Initialize the velocities of the system by having the correct temperature
     velocities = initialize_velocities(params.ktemp, nf, rng, params.n_particles)
     # Adjust the particles using the velocities
@@ -166,14 +160,21 @@ function simulation(params::Parameters, pathname; eq_steps=100, prod_steps=500)
 
     # Write the final configuration
     final_configuration = joinpath(pathname, "final.xyz")
+    step = eq_steps + prod_steps
     write_to_file(
-        final_configuration, step, boxl, params.n_particles, system.positions, diameters; mode="w"
+        final_configuration,
+        step,
+        boxl,
+        params.n_particles,
+        system.positions,
+        diameters;
+        mode="w",
     )
 
-    # Close all opened files
-    close(thermo_file)
-    # Also compress the trajectory file
-    compress_gz(trajectory_file)
+    # Also compress the trajectory file, if it exists
+    if isfile(trajectory_file)
+        compress_gz(trajectory_file)
+    end
 
     return nothing
 end
@@ -182,14 +183,22 @@ function main()
     densities = [0.95]
     ktemp = 1.4671
     n_particles = 2^14
-
+    
     for d in densities
+        original_path = "N=$(n_particles)_density=$(@sprintf("%.4g", d))"
         params = Parameters(d, ktemp, n_particles)
         # Create a new directory with these parameters
-        pathname = joinpath(@__DIR__, "N=$(n_particles)_density=$(@sprintf("%.4g", d))")
-        # mkpath(pathname)
-        # simulation(params, pathname; eq_steps=10_000_000, prod_steps=100_000_000)
-        read_file(joinpath(pathname, "final.xyz"))
+        pathname = joinpath(
+            @__DIR__, "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))"
+        )
+        mkpath(pathname)
+        simulation(
+            params,
+            pathname;
+            from_file=joinpath(original_path, "initial.xyz"),
+            eq_steps=10_000,
+            prod_steps=10_000,
+        )
     end
 
     return nothing

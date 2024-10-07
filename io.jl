@@ -30,26 +30,40 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
 end
 
 function read_file(filepath)
+    # Initialize the variables with a default value
+    n_particles = 0
+    box_l = 0.0
+    positions = []
+    radii = []
+
     open(filepath, "r") do io
         # First line is the number of particles
         line = readline(io)
         n_particles = parse(Int64, line)
 
         # The second line we can skip for now
-        _ = readline(io)
+        line = split(readline(io), " ")
+        # The fifth position included the box size length information
+        box_l = parse(Float64, line[5])
         
         # Now read each line and gather the information
         positions = [@SVector(zeros(2)) for _ in 1:n_particles]
-        diameters = zeros(n_particles)
+        radii = zeros(n_particles)
 
         for i in 1:n_particles
             line = split(readline(io), " ")
             parsed_line = parse.(Float64, line)
             positions[i] = SVector{2}(parsed_line[4:end])
-            diameters[i] = parsed_line[3]
+            radii[i] = parsed_line[3]
         end
     end
+
+    # The information read are the radii, so convert to diameters
+    diameters = radii .* 2.0
+
+    return box_l, positions, diameters
 end
+
 
 function compress_gz(filepath)
     # Attach the suffix to the original file
