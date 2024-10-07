@@ -82,3 +82,21 @@ function compress_gz(filepath)
     
     return nothing
 end
+
+function open_files(pathname)
+    # Open files for trajectory and other things
+    trajectory_file = joinpath(pathname, "production.xyz")
+    eq_trajectory_file = joinpath(pathname, "equilibration.xyz")
+    thermo_file = joinpath(pathname, "thermo.txt")
+    eq_thermo_file = joinpath(pathname, "eq_thermo.txt")
+
+    files = [trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file]
+
+    for file in files
+        if isfile(file)
+            rm(file)
+        end
+    end
+
+    return (trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file)
+end

@@ -103,7 +103,9 @@ function initialize_simulation(params::Parameters; file="")
             output_name=:energy_and_forces,
             parallel=false,
         )
+        @info "Reading done."
     else
+        @info "Creating a new system."
         # For a polydisperse mixture, we need the diameters before anything else
         polydispersity = 0.11
         diameters = initialize_diameters(params.n_particles, polydispersity)

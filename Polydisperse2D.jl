@@ -59,7 +59,6 @@ function simulation(
 
     # Initialize the system
     (system, diameters, volume, boxl) = initialize_simulation(params; file=from_file)
-    @show diameters
 
     # Initialize the velocities of the system by having the correct temperature
     velocities = initialize_velocities(params.ktemp, nf, rng, params.n_particles)
@@ -70,12 +69,12 @@ function simulation(
     # Zero out the arrays
     reset_output!(system.energy_and_forces)
 
-    # Open files for trajectory and other things
-    trajectory_file = joinpath(pathname, "production.xyz")
-    eq_trajectory_file = joinpath(pathname, "equilibration.xyz")
-    thermo_file = joinpath(pathname, "thermo.txt")
-    eq_thermo_file = joinpath(pathname, "eq_thermo.txt")
+    # Remove the files if they existed, and return the files handles
+    (trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file) = open_files(
+        pathname
+    )
 
+    # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
         for i in eachindex(system.positions, system.energy_and_forces.forces, velocities)
             f = system.energy_and_forces.forces[i]
@@ -183,9 +182,8 @@ function main()
     densities = [0.95]
     ktemp = 1.4671
     n_particles = 2^14
-    
+
     for d in densities
-        original_path = "N=$(n_particles)_density=$(@sprintf("%.4g", d))"
         params = Parameters(d, ktemp, n_particles)
         # Create a new directory with these parameters
         pathname = joinpath(
@@ -195,7 +193,7 @@ function main()
         simulation(
             params,
             pathname;
-            from_file=joinpath(original_path, "initial.xyz"),
+            from_file=joinpath(pathname, "initial.xyz"),
             eq_steps=10_000,
             prod_steps=10_000,
         )
