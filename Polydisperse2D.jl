@@ -19,6 +19,7 @@ struct Parameters
     ρ::Float64
     ktemp::Float64
     n_particles::Int
+    polydispersity::Float64
 end
 
 include("initialization.jl")
@@ -58,7 +59,9 @@ function simulation(
     kinetic_energy = 0.0
 
     # Initialize the system
-    (system, diameters, volume, boxl) = initialize_simulation(params; file=from_file)
+    (system, diameters, volume, boxl) = initialize_simulation(
+        params, pathname; polydispersity=params.polydispersity, file=from_file
+    )
 
     # Initialize the velocities of the system by having the correct temperature
     velocities = initialize_velocities(params.ktemp, nf, rng, params.n_particles)
@@ -128,7 +131,8 @@ function simulation(
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
             temperature = 2.0 * kinetic_energy / nf
-            pressure = virial / (dimension * nprom * volume)
+            # pressure = virial / (dimension * nprom * volume)
+            pressure = (kinetic_energy + virial) / (dimension * nprom * volume)
             pressure += params.ρ * temperature
             open(eq_thermo_file, "a") do io
                 writedlm(io, [step ener_part temperature pressure], " ")
@@ -182,21 +186,17 @@ function main()
     densities = [0.95]
     ktemp = 1.4671
     n_particles = 2^14
+    polydispersity = 0.16
 
     for d in densities
-        params = Parameters(d, ktemp, n_particles)
+        params = Parameters(d, ktemp, n_particles, polydispersity)
         # Create a new directory with these parameters
         pathname = joinpath(
-            @__DIR__, "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))"
+            @__DIR__,
+            "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(
-            params,
-            pathname;
-            from_file=joinpath(pathname, "initial.xyz"),
-            eq_steps=10_000,
-            prod_steps=10_000,
-        )
+        simulation(params, pathname; eq_steps=1_000_000, prod_steps=1)
     end
 
     return nothing

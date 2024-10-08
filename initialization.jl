@@ -80,7 +80,7 @@ function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     return system, diameters
 end
 
-function initialize_simulation(params::Parameters; file="")
+function initialize_simulation(params::Parameters, pathname; polydispersity=0.11, file="")
     # Always leave a fixed cutoff
     cutoff = 1.1
     diameters = []
@@ -107,7 +107,6 @@ function initialize_simulation(params::Parameters; file="")
     else
         @info "Creating a new system."
         # For a polydisperse mixture, we need the diameters before anything else
-        polydispersity = 0.11
         diameters = initialize_diameters(params.n_particles, polydispersity)
 
         # Now we compute the effective size of the box
