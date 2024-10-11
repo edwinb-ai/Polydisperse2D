@@ -28,9 +28,7 @@ include("thermostat.jl")
 include("pairwise.jl")
 include("io.jl")
 
-function integrate_half!(
-    positions, velocities, forces, dt::Float64, boxl::Float64; pbc=true
-)
+function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float64)
     for i in eachindex(positions, forces, velocities)
         f = forces[i]
         x = positions[i]
@@ -38,13 +36,7 @@ function integrate_half!(
         # ! Important: There is a mass in the force term
         velocities[i] = @. v + (f * dt / 2.0)
         positions[i] = @. x + (v * dt)
-        # (new_x, new_v) = integrate_half!(x, v, f, dt, boxl)
-        # velocities[i] = new_v
-        # positions[i] = new_x
-        # Periodic boundary conditions
-        # if pbc
         positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
-        # end
     end
 
     return nothing
@@ -58,6 +50,10 @@ function integrate_second_half!(velocities, forces, dt)
     end
 
     return nothing
+end
+
+function adapted_energy_forces(diameters)
+    return (x, y, i, j, d2, output) -> energy_and_forces!(x, y, i, j, d2, output, diameters)
 end
 
 function simulation(
@@ -81,7 +77,7 @@ function simulation(
 
     # Initialize the system
     (system, diameters, volume, boxl) = initialize_simulation(
-        params, pathname; polydispersity=params.polydispersity, file=""
+        params, pathname; polydispersity=params.polydispersity, file=from_file
     )
 
     # Initialize the velocities of the system by having the correct temperature
@@ -100,12 +96,9 @@ function simulation(
     # Formatting string
     format_string = Printf.Format("%d %.6f %.6f %.6f\n")
 
-    function adapted_energy_forces(x, y, i, j, d2, output)
-        return energy_and_forces!(x, y, i, j, d2, output, diameters)
-    end
-
     # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
+        # First half of the integration
         integrate_half!(
             system.positions, velocities, system.energy_and_forces.forces, dt, boxl
         )
@@ -113,11 +106,7 @@ function simulation(
         # Zero out arrays
         reset_output!(system.energy_and_forces)
         # Compute energy and forces
-        map_pairwise!(
-            (x, y, i, j, d2, output) ->
-                energy_and_forces!(x, y, i, j, d2, output, diameters),
-            system,
-        )
+        map_pairwise!(adapted_energy_forces(diameters), system)
 
         # Second half of the integration
         integrate_second_half!(velocities, system.energy_and_forces.forces, dt)
@@ -220,10 +209,10 @@ function simulation(
 end
 
 function main()
-    densities = [0.95]
+    densities = [0.6]
     ktemp = 1.4671
     n_particles = 2^10
-    polydispersity = 0.15
+    polydispersity = 0.0
 
     for d in densities
         params = Parameters(densities[1], ktemp, n_particles, polydispersity)
@@ -233,18 +222,7 @@ function main()
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        # restart_path = joinpath(
-        #     @__DIR__,
-        #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
-        # )
-        # mkpath(restart_path)
-        simulation(
-            params,
-            pathname;
-            # from_file=joinpath(restart_path, "final.xyz"),
-            eq_steps=1_000_000,
-            prod_steps=1_000_000,
-        )
+        simulation(params, pathname; eq_steps=1_000_000, prod_steps=0)
     end
 
     return nothing

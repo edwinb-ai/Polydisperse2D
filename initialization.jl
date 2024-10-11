@@ -67,11 +67,13 @@ function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     filepath = joinpath(pathname, "initial.xyz")
     write_to_file(filepath, 0, boxl, n_particles, positions, diameters)
 
+    # Compute a different cutoff to change the number of cells
+    cell_cutoff = max(cutoff, boxl / sqrt(n_particles))
     # Initialize system
     system = CellListMap.ParticleSystem(;
         xpositions=positions,
         unitcell=[boxl, boxl],
-        cutoff=cutoff,
+        cutoff=cell_cutoff,
         output=EnergyAndForces(0.0, 0.0, similar(positions)),
         output_name=:energy_and_forces,
         parallel=false,
@@ -117,7 +119,7 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
         # Now we compute the effective size of the box
         boxl = sqrt(sum(diameters .^ 2) / params.ρ)
         volume = boxl^2
-        
+
         # Initialize the system in a lattice configuration
         (system, diameters) = init_system(
             boxl, cutoff, pathname, diameters; n_particles=params.n_particles
