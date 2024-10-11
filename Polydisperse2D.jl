@@ -28,16 +28,36 @@ include("thermostat.jl")
 include("pairwise.jl")
 include("io.jl")
 
-function integrate_half(positions, velocities, forces, dt, boxl; pbc=true)
-    # ! Important: There is a mass in the force term
-    new_velocities = @. velocities + (forces * dt / 2.0)
-    new_positions = @. positions + (new_velocities * dt)
-    # Periodic boundary conditions
-    if pbc
-        new_positions = @. new_positions - boxl * round(new_positions / boxl)
+function integrate_half!(
+    positions, velocities, forces, dt::Float64, boxl::Float64; pbc=true
+)
+    for i in eachindex(positions, forces, velocities)
+        f = forces[i]
+        x = positions[i]
+        v = velocities[i]
+        # ! Important: There is a mass in the force term
+        velocities[i] = @. v + (f * dt / 2.0)
+        positions[i] = @. x + (v * dt)
+        # (new_x, new_v) = integrate_half!(x, v, f, dt, boxl)
+        # velocities[i] = new_v
+        # positions[i] = new_x
+        # Periodic boundary conditions
+        # if pbc
+        positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
+        # end
     end
 
-    return new_positions, new_velocities
+    return nothing
+end
+
+function integrate_second_half!(velocities, forces, dt)
+    for i in eachindex(velocities, forces)
+        f = forces[i]
+        v = velocities[i]
+        velocities[i] = @. v + (f * dt / 2.0)
+    end
+
+    return nothing
 end
 
 function simulation(
@@ -57,10 +77,11 @@ function simulation(
     virial = 0.0
     nprom = 0
     kinetic_energy = 0.0
+    kinetic_temperature = 0.0
 
     # Initialize the system
     (system, diameters, volume, boxl) = initialize_simulation(
-        params, pathname; polydispersity=params.polydispersity, file=from_file
+        params, pathname; polydispersity=params.polydispersity, file=""
     )
 
     # Initialize the velocities of the system by having the correct temperature
@@ -76,17 +97,18 @@ function simulation(
     (trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file) = open_files(
         pathname
     )
+    # Formatting string
+    format_string = Printf.Format("%d %.6f %.6f %.6f\n")
+
+    function adapted_energy_forces(x, y, i, j, d2, output)
+        return energy_and_forces!(x, y, i, j, d2, output, diameters)
+    end
 
     # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
-        for i in eachindex(system.positions, system.energy_and_forces.forces, velocities)
-            f = system.energy_and_forces.forces[i]
-            x = system.positions[i]
-            v = velocities[i]
-            (new_x, new_v) = integrate_half(x, v, f, dt, boxl)
-            velocities[i] = new_v
-            system.positions[i] = new_x
-        end
+        integrate_half!(
+            system.positions, velocities, system.energy_and_forces.forces, dt, boxl
+        )
 
         # Zero out arrays
         reset_output!(system.energy_and_forces)
@@ -98,19 +120,17 @@ function simulation(
         )
 
         # Second half of the integration
-        for i in eachindex(velocities, system.energy_and_forces.forces)
-            f = system.energy_and_forces.forces[i]
-            v = velocities[i]
-            velocities[i] = @. v + (f * dt / 2.0)
-        end
+        integrate_second_half!(velocities, system.energy_and_forces.forces, dt)
 
         # Always apply the thermostat and compute the kinetic energy
         bussi!(velocities, params.ktemp, nf, dt, τ, rng)
         kinetic_energy = compute_kinetic(velocities)
+        temperature = 2.0 * kinetic_energy / nf
 
         # Accumulate the values of the virial for computing the pressure
-        if mod(step, 100) == 0
+        if mod(step, 10) == 0
             virial += system.energy_and_forces.virial
+            kinetic_temperature += temperature
             nprom += 1
         end
 
@@ -118,25 +138,38 @@ function simulation(
         if mod(step, 1_000) == 0 && step > eq_steps
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
-            temperature = 2.0 * kinetic_energy / nf
+            average_temperature = kinetic_temperature / nprom
             pressure = virial / (dimension * nprom * volume)
-            pressure += params.ρ * temperature
+            pressure += params.ρ * average_temperature
             open(thermo_file, "a") do io
-                writedlm(io, [step ener_part temperature pressure], " ")
+                Printf.format(
+                    io, format_string, step, ener_part, average_temperature, pressure
+                )
             end
+
+            # Reset the values of accumulators
+            virial = 0.0
+            kinetic_temperature = 0.0
+            nprom = 0.0
         end
 
         # Every few steps we save thermodynamic quantities to disk, equilibration
-        if mod(step, 1_000) == 0 && step <= eq_steps
+        if mod(step, 10_000) == 0 && step <= eq_steps
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
-            temperature = 2.0 * kinetic_energy / nf
-            # pressure = virial / (dimension * nprom * volume)
-            pressure = (kinetic_energy + virial) / (dimension * nprom * volume)
-            pressure += params.ρ * temperature
+            average_temperature = kinetic_temperature / nprom
+            pressure = virial / (dimension * nprom * volume)
+            pressure += params.ρ * average_temperature
             open(eq_thermo_file, "a") do io
-                writedlm(io, [step ener_part temperature pressure], " ")
+                Printf.format(
+                    io, format_string, step, ener_part, average_temperature, pressure
+                )
             end
+
+            # Reset the values of accumulators
+            virial = 0.0
+            kinetic_temperature = 0.0
+            nprom = 0.0
         end
 
         # Save to disk the positions during equilibration
@@ -179,24 +212,39 @@ function simulation(
         compress_gz(trajectory_file)
     end
 
+    if isfile(eq_trajectory_file)
+        compress_gz(eq_trajectory_file)
+    end
+
     return nothing
 end
 
 function main()
     densities = [0.95]
     ktemp = 1.4671
-    n_particles = 2^14
-    polydispersity = 0.16
+    n_particles = 2^10
+    polydispersity = 0.15
 
     for d in densities
-        params = Parameters(d, ktemp, n_particles, polydispersity)
+        params = Parameters(densities[1], ktemp, n_particles, polydispersity)
         # Create a new directory with these parameters
         pathname = joinpath(
             @__DIR__,
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=1_000_000, prod_steps=1)
+        # restart_path = joinpath(
+        #     @__DIR__,
+        #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
+        # )
+        # mkpath(restart_path)
+        simulation(
+            params,
+            pathname;
+            # from_file=joinpath(restart_path, "final.xyz"),
+            eq_steps=1_000_000,
+            prod_steps=1_000_000,
+        )
     end
 
     return nothing

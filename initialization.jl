@@ -88,7 +88,7 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
     boxl = 0.0
     volume = 0.0
     system = nothing
-    
+
     if isfile(file)
         @info "Reading from file..."
         (boxl, positions, diameters) = read_file(file)
@@ -103,6 +103,11 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
             output_name=:energy_and_forces,
             parallel=false,
         )
+
+        # Save the initial configuration to a file
+        filepath = joinpath(pathname, "initial.xyz")
+        write_to_file(filepath, 0, boxl, params.n_particles, positions, diameters)
+
         @info "Reading done."
     else
         @info "Creating a new system."
