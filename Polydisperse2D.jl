@@ -209,10 +209,10 @@ function simulation(
 end
 
 function main()
-    densities = [0.6]
+    densities = [0.955]
     ktemp = 1.4671
-    n_particles = 2^10
-    polydispersity = 0.0
+    n_particles = 2^14
+    polydispersity = 0.15
 
     for d in densities
         params = Parameters(densities[1], ktemp, n_particles, polydispersity)
@@ -222,7 +222,7 @@ function main()
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=1_000_000, prod_steps=0)
+        simulation(params, pathname; eq_steps=10_000_000, prod_steps=1_000_000)
     end
 
     return nothing

@@ -67,13 +67,11 @@ function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     filepath = joinpath(pathname, "initial.xyz")
     write_to_file(filepath, 0, boxl, n_particles, positions, diameters)
 
-    # Compute a different cutoff to change the number of cells
-    cell_cutoff = max(cutoff, boxl / sqrt(n_particles))
     # Initialize system
     system = CellListMap.ParticleSystem(;
         xpositions=positions,
         unitcell=[boxl, boxl],
-        cutoff=cell_cutoff,
+        cutoff=cutoff,
         output=EnergyAndForces(0.0, 0.0, similar(positions)),
         output_name=:energy_and_forces,
         parallel=false,
