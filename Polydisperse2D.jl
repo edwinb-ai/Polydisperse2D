@@ -52,10 +52,6 @@ function integrate_second_half!(velocities, forces, dt)
     return nothing
 end
 
-function adapted_energy_forces(diameters)
-    return (x, y, i, j, d2, output) -> energy_and_forces!(x, y, i, j, d2, output, diameters)
-end
-
 function simulation(
     params::Parameters, pathname; from_file="", eq_steps=100, prod_steps=500
 )
@@ -106,7 +102,11 @@ function simulation(
         # Zero out arrays
         reset_output!(system.energy_and_forces)
         # Compute energy and forces
-        map_pairwise!(adapted_energy_forces(diameters), system)
+        CellListMap.map_pairwise!(
+            (x, y, i, j, d2, output) ->
+                energy_and_forces!(x, y, i, j, d2, output, diameters),
+            system,
+        )
 
         # Second half of the integration
         integrate_second_half!(velocities, system.energy_and_forces.forces, dt)
