@@ -39,7 +39,7 @@ function initialize_diameters(n_particles, polydispersity)
     diameters = zeros(n_particles)
     poly_dist = Normal(mean_diameter, polydispersity)
 
-    for i in 1:n_particles
+    for i in eachindex(diameters)
         new_diameter = rand(poly_dist)
         # Make sure no diameters are larger than 1
         while new_diameter > 1.0

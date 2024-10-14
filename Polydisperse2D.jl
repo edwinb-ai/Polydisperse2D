@@ -35,7 +35,7 @@ function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float
         v = velocities[i]
         # ! Important: There is a mass in the force term
         velocities[i] = @. v + (f * dt / 2.0)
-        positions[i] = @. x + (v * dt)
+        positions[i] = @. x + (velocities[i] * dt)
         positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
     end
 
@@ -219,10 +219,10 @@ function main()
         # Create a new directory with these parameters
         pathname = joinpath(
             @__DIR__,
-            "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
+            "test_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=10_000_000, prod_steps=1_000_000)
+        simulation(params, pathname; eq_steps=100_000, prod_steps=1)
     end
 
     return nothing
