@@ -45,7 +45,7 @@ function read_file(filepath)
         line = split(readline(io), " ")
         # The fifth position included the box size length information
         box_l = parse(Float64, line[5])
-        
+
         # Now read each line and gather the information
         positions = [@SVector(zeros(2)) for _ in 1:n_particles]
         radii = zeros(n_particles)
@@ -64,11 +64,10 @@ function read_file(filepath)
     return box_l, positions, diameters
 end
 
-
 function compress_gz(filepath)
     # Attach the suffix to the original file
     output_file = filepath * ".gz"
-    
+
     open(filepath, "r") do infile
         # Open the output file for writing, with gzip compression
         open(GzipCompressorStream, output_file, "w") do outfile
@@ -79,7 +78,7 @@ function compress_gz(filepath)
 
     # To avoid having double the files, we delete the original one
     rm(filepath)
-    
+
     return nothing
 end
 

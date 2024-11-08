@@ -70,7 +70,7 @@ function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     # Initialize system
     system = CellListMap.ParticleSystem(;
         xpositions=positions,
-        unitcell=[boxl, boxl],
+        unitcell=unitcell,
         cutoff=cutoff,
         output=EnergyAndForces(0.0, 0.0, similar(positions)),
         output_name=:energy_and_forces,

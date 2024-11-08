@@ -1,6 +1,6 @@
 using Random
 using StaticArrays
-using LinearAlgebra: dot
+using LinearAlgebra
 using DelimitedFiles: writedlm, readdlm
 using Printf
 using FastPow
@@ -27,6 +27,7 @@ include("potentials.jl")
 include("thermostat.jl")
 include("pairwise.jl")
 include("io.jl")
+include("minimize.jl")
 
 function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float64)
     for i in eachindex(positions, forces, velocities)
@@ -208,6 +209,51 @@ function simulation(
     return nothing
 end
 
+function read_minimize(params::Parameters, pathname; from_file="")
+    # Initialize the system
+    (system, diameters, _, boxl) = initialize_simulation(
+        params, pathname; polydispersity=params.polydispersity, file=from_file
+    )
+
+    # Zero out arrays
+    reset_output!(system.energy_and_forces)
+    # Compute energy and forces
+    CellListMap.map_pairwise!(
+        (x, y, i, j, d2, output) -> energy_and_forces!(x, y, i, j, d2, output, diameters),
+        system,
+    )
+
+    current_energy = system.energy_and_forces.energy
+    println("Initial energy: $(current_energy)")
+
+    minimize(system, diameters, boxl)
+
+    # Zero out arrays
+    reset_output!(system.energy_and_forces)
+    # Compute energy and forces
+    CellListMap.map_pairwise!(
+        (x, y, i, j, d2, output) -> energy_and_forces!(x, y, i, j, d2, output, diameters),
+        system,
+    )
+
+    current_energy = system.energy_and_forces.energy
+    println("Final energy: $(current_energy)")
+
+    final_configuration = joinpath(pathname, "minimized.xyz")
+    step = 0
+    write_to_file(
+        final_configuration,
+        step,
+        boxl,
+        params.n_particles,
+        system.positions,
+        diameters;
+        mode="w",
+    )
+
+    return nothing
+end
+
 function main()
     densities = [0.955]
     ktemp = 1.4671
@@ -221,8 +267,9 @@ function main()
             @__DIR__,
             "test_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
-        mkpath(pathname)
-        simulation(params, pathname; eq_steps=100_000, prod_steps=1)
+        # mkpath(pathname)
+        # simulation(params, pathname; eq_steps=100_000, prod_steps=1)
+        read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end
 
     return nothing
