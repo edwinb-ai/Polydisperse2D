@@ -197,6 +197,19 @@ function simulation(
         mode="w",
     )
 
+    # Also do a minimization of the system
+    minimize(system, diameters, boxl; tolerance=1e-5)
+    min_configuration = joinpath(pathname, "minimized.xyz")
+    write_to_file(
+        min_configuration,
+        step,
+        boxl,
+        params.n_particles,
+        system.positions,
+        diameters;
+        mode="w",
+    )
+
     # Also compress the trajectory file, if it exists
     if isfile(trajectory_file)
         compress_gz(trajectory_file)
@@ -257,7 +270,7 @@ end
 function main()
     densities = [0.955]
     ktemp = 1.4671
-    n_particles = 2^14
+    n_particles = 2^12
     polydispersity = 0.15
 
     for d in densities
@@ -265,11 +278,11 @@ function main()
         # Create a new directory with these parameters
         pathname = joinpath(
             @__DIR__,
-            "test_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
+            "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
-        # mkpath(pathname)
-        # simulation(params, pathname; eq_steps=100_000, prod_steps=1)
-        read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
+        mkpath(pathname)
+        simulation(params, pathname; eq_steps=100_000, prod_steps=1)
+        # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end
 
     return nothing
