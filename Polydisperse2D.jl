@@ -20,6 +20,7 @@ struct Parameters
     ktemp::Float64
     n_particles::Int
     polydispersity::Float64
+    dt::Float64
 end
 
 include("initialization.jl")
@@ -29,7 +30,7 @@ include("pairwise.jl")
 include("io.jl")
 include("minimize.jl")
 
-function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float64)
+function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float64; pbc)
     for i in eachindex(positions, forces, velocities)
         f = forces[i]
         x = positions[i]
@@ -37,7 +38,9 @@ function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float
         # ! Important: There is a mass in the force term
         velocities[i] = @. v + (f * dt / 2.0)
         positions[i] = @. x + (velocities[i] * dt)
-        positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
+        if pbc
+            positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
+        end
     end
 
     return nothing
@@ -59,7 +62,7 @@ function simulation(
     rng = Random.Xoshiro()
 
     # Set the timestep and the damping constant for the thermostat
-    dt = 0.0001
+    dt = params.dt
     τ = 100.0 * dt
     # The degrees of freedom
     # Spatial dimension, in this case 2D simulations
@@ -71,6 +74,15 @@ function simulation(
     nprom = 0
     kinetic_energy = 0.0
     kinetic_temperature = 0.0
+
+    # Parameters for saving configurations to disk
+    pbc = true
+    num_snapshots = 100
+    snapshot_times = exp.(range(log(dt), log(prod_steps); length=num_snapshots))
+    snapshot_times = unique.(round.(snapshot_times ./ dt) .* dt)
+    num_snapshots = length(snapshot_times)
+    current_time = 0.0
+    current_snapshot_index = 1
 
     # Initialize the system
     (system, diameters, volume, boxl) = initialize_simulation(
@@ -95,9 +107,12 @@ function simulation(
 
     # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
+        if step > eq_steps
+            pbc = false
+        end
         # First half of the integration
         integrate_half!(
-            system.positions, velocities, system.energy_and_forces.forces, dt, boxl
+            system.positions, velocities, system.energy_and_forces.forces, dt, boxl; pbc=pbc
         )
 
         # Zero out arrays
@@ -176,11 +191,22 @@ function simulation(
         end
 
         # Save to disk the positions during production
-        if mod(step, 1_000) == 0 && step > eq_steps
-            # Write to file
-            write_to_file(
-                trajectory_file, step, boxl, params.n_particles, system.positions, diameters
-            )
+        if step > eq_steps && current_snapshot_index <= num_snapshots
+            snap_time = snapshot_times[current_snapshot_index][1]
+            if current_snapshot_index <= num_snapshots && current_time >= snap_time
+                # Write to file
+                filename = joinpath(pathname, "snapshot_$(@sprintf("%.5g", snap_time)).xyz")
+                write_to_file(
+                    filename,
+                    current_time,
+                    boxl,
+                    params.n_particles,
+                    system.positions,
+                    diameters,
+                )
+                current_snapshot_index += 1
+            end
+            current_time += dt
         end
     end
 
@@ -268,20 +294,21 @@ function read_minimize(params::Parameters, pathname; from_file="")
 end
 
 function main()
-    densities = [0.955]
+    densities = [0.7]
     ktemp = 1.4671
-    n_particles = 2^12
-    polydispersity = 0.15
+    n_particles = 2^11
+    polydispersity = 0.0
+    dt = 0.001
 
     for d in densities
-        params = Parameters(densities[1], ktemp, n_particles, polydispersity)
+        params = Parameters(densities[1], ktemp, n_particles, polydispersity, dt)
         # Create a new directory with these parameters
         pathname = joinpath(
             @__DIR__,
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=100_000, prod_steps=1)
+        simulation(params, pathname; eq_steps=10_000, prod_steps=10_000)
         # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end
 

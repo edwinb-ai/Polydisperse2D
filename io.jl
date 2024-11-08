@@ -4,7 +4,7 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
         println(io, n_particles)
         Printf.@printf(
             io,
-            "Lattice=\"%lf 0.0 0.0 0.0 %lf 0.0 0.0 0.0 0.0\" Properties=type:I:1:id:I:1:radius:R:1:pos:R:2 Time=%d\n",
+            "Lattice=\"%lf 0.0 0.0 0.0 %lf 0.0 0.0 0.0 0.0\" Properties=type:I:1:id:I:1:radius:R:1:pos:R:2 Time=%.6g\n",
             boxl,
             boxl,
             step
