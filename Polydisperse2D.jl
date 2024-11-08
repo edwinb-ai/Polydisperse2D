@@ -77,7 +77,7 @@ function simulation(
 
     # Parameters for saving configurations to disk
     pbc = true
-    num_snapshots = 100
+    num_snapshots = 1000
     snapshot_times = exp.(range(log(dt), log(prod_steps); length=num_snapshots))
     snapshot_times = unique.(round.(snapshot_times ./ dt) .* dt)
     num_snapshots = length(snapshot_times)
@@ -308,7 +308,7 @@ function main()
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=10_000, prod_steps=10_000)
+        simulation(params, pathname; eq_steps=500_000, prod_steps=1_000_000)
         # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end
 
