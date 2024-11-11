@@ -78,12 +78,13 @@ function simulation(
 
     # Parameters for saving configurations to disk
     pbc = true
-    num_snapshots = 2000
+    num_snapshots = 1000
     snapshot_times = exp.(range(log(dt), log(prod_steps); length=num_snapshots))
     snapshot_times = unique.(round.(snapshot_times ./ dt) .* dt)
     num_snapshots = length(snapshot_times)
     current_time = 0.0
     current_snapshot_index = 1
+    current_step = 0
 
     # Initialize the system
     (system, diameters, volume, boxl) = initialize_simulation(
@@ -110,6 +111,8 @@ function simulation(
     for step in 1:(eq_steps + prod_steps)
         if step > eq_steps
             pbc = false
+            # Update the production step variable
+            current_step += 1
         end
         # First half of the integration
         integrate_half!(
@@ -196,7 +199,7 @@ function simulation(
             snap_time = snapshot_times[current_snapshot_index][1]
             if current_snapshot_index <= num_snapshots && current_time >= snap_time
                 # Write to file
-                filename = joinpath(pathname, "snapshot_$(step).xyz")
+                filename = joinpath(pathname, "snapshot_$(current_step).xyz")
                 write_to_file(
                     filename,
                     current_time,
