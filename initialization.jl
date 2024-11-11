@@ -26,13 +26,6 @@ function initialize_lattice(n_particles::Int, boxl::Float64)
     return x_positions, y_positions
 end
 
-function initialize_random(unitcell, npart, rng; tol=1.0)
-    coordinates = unitcell[1] * rand(rng, StaticArrays.SVector{2,Float64}, npart)
-    pack_monoatomic!(coordinates, unitcell, tol; parallel=false, iprint=100)
-
-    return coordinates
-end
-
 function initialize_diameters(n_particles, polydispersity)
     # Now generate an array of normally distributed diameters
     mean_diameter = 1.0
@@ -82,7 +75,7 @@ end
 
 function initialize_simulation(params::Parameters, pathname; polydispersity=0.11, file="")
     # Always leave a fixed cutoff
-    cutoff = 1.1
+    cutoff = 1.5
     diameters = []
     positions = []
     boxl = 0.0

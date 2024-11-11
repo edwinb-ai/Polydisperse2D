@@ -9,7 +9,6 @@ using Distributions: Gamma, Normal
 using CodecZlib
 using CellListMap
 import CellListMap: copy_output, reset_output!, reducer
-using Packmol: pack_monoatomic!
 
 # Some numerical constants
 const b_param = 1.0204081632653061
@@ -30,7 +29,9 @@ include("pairwise.jl")
 include("io.jl")
 include("minimize.jl")
 
-function integrate_half!(positions, velocities, forces, dt::Float64, boxl::Float64; pbc)
+function integrate_half!(
+    positions, velocities, forces, dt::Float64, boxl::Float64; pbc=true
+)
     for i in eachindex(positions, forces, velocities)
         f = forces[i]
         x = positions[i]
@@ -77,7 +78,7 @@ function simulation(
 
     # Parameters for saving configurations to disk
     pbc = true
-    num_snapshots = 1000
+    num_snapshots = 2000
     snapshot_times = exp.(range(log(dt), log(prod_steps); length=num_snapshots))
     snapshot_times = unique.(round.(snapshot_times ./ dt) .* dt)
     num_snapshots = length(snapshot_times)
@@ -195,7 +196,7 @@ function simulation(
             snap_time = snapshot_times[current_snapshot_index][1]
             if current_snapshot_index <= num_snapshots && current_time >= snap_time
                 # Write to file
-                filename = joinpath(pathname, "snapshot_$(@sprintf("%.5g", snap_time)).xyz")
+                filename = joinpath(pathname, "snapshot_$(step).xyz")
                 write_to_file(
                     filename,
                     current_time,
@@ -294,11 +295,12 @@ function read_minimize(params::Parameters, pathname; from_file="")
 end
 
 function main()
-    densities = [0.7]
+    # Read the density from the command line
+    densities = parse(Float64, ARGS[1])
     ktemp = 1.4671
     n_particles = 2^11
-    polydispersity = 0.0
-    dt = 0.001
+    polydispersity = 0.15
+    dt = 0.0001
 
     for d in densities
         params = Parameters(densities[1], ktemp, n_particles, polydispersity, dt)
@@ -308,7 +310,14 @@ function main()
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
-        simulation(params, pathname; eq_steps=500_000, prod_steps=1_000_000)
+        # Restart from a previous file
+        simulation(
+            params,
+            pathname;
+            # from_file=initial_conf_path,
+            eq_steps=10_000_000,
+            prod_steps=100_000_000,
+        )
         # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end
 
