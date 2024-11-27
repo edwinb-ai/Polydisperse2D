@@ -76,6 +76,10 @@ function minimize(system, diameters, boxl; dt=0.0001, tolerance=1e-4)
         max_force = maximum(norm.(system.energy_and_forces.forces))
         if max_force < tolerance
             converged = true
+            if converged
+                @info "Converged."
+                @info max_force
+            end
         end
     end
 

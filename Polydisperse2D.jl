@@ -78,11 +78,8 @@ function simulation(
 
     # Parameters for saving configurations to disk
     pbc = true
-    num_snapshots = 1000
-    snapshot_times = exp.(range(log(dt), log(prod_steps); length=num_snapshots))
-    snapshot_times = unique.(round.(snapshot_times ./ dt) .* dt)
-    num_snapshots = length(snapshot_times)
-    current_time = 0.0
+    snapshot_times = vec(readdlm("new-log-times.txt", Int64; skipstart = 1))
+    insert!(snapshot_times, 1, 0)
     current_snapshot_index = 1
     current_step = 0
 
@@ -109,11 +106,7 @@ function simulation(
 
     # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
-        if step > eq_steps
-            pbc = false
-            # Update the production step variable
-            current_step += 1
-        end
+        
         # First half of the integration
         integrate_half!(
             system.positions, velocities, system.energy_and_forces.forces, dt, boxl; pbc=pbc
@@ -144,7 +137,7 @@ function simulation(
         end
 
         # Every few steps we save thermodynamic quantities to disk
-        if mod(step, 1_000) == 0 && step > eq_steps
+        if mod(step, 10_000) == 0 && step > eq_steps
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
             average_temperature = kinetic_temperature / nprom
@@ -152,7 +145,7 @@ function simulation(
             pressure += params.ρ * average_temperature
             open(thermo_file, "a") do io
                 Printf.format(
-                    io, format_string, step, ener_part, average_temperature, pressure
+                    io, format_string, current_step + 1, ener_part, average_temperature, pressure
                 )
             end
 
@@ -195,14 +188,14 @@ function simulation(
         end
 
         # Save to disk the positions during production
-        if step > eq_steps && current_snapshot_index <= num_snapshots
-            snap_time = snapshot_times[current_snapshot_index][1]
-            if current_snapshot_index <= num_snapshots && current_time >= snap_time
+        if step > eq_steps && current_step <= prod_steps
+            snap_step = snapshot_times[current_snapshot_index]
+            if snap_step <= prod_steps && snap_step == current_step
                 # Write to file
-                filename = joinpath(pathname, "snapshot_$(current_step).xyz")
-                write_to_file(
+                filename = joinpath(pathname, "snapshot.$(snap_step)")
+                write_to_file_lammps(
                     filename,
-                    current_time,
+                    snap_step,
                     boxl,
                     params.n_particles,
                     system.positions,
@@ -210,7 +203,12 @@ function simulation(
                 )
                 current_snapshot_index += 1
             end
-            current_time += dt
+        end
+
+        if step > eq_steps
+            pbc = false
+            # Update the production step variable
+            current_step += 1
         end
     end
 
@@ -228,17 +226,17 @@ function simulation(
     )
 
     # Also do a minimization of the system
-    minimize(system, diameters, boxl; tolerance=1e-5)
-    min_configuration = joinpath(pathname, "minimized.xyz")
-    write_to_file(
-        min_configuration,
-        step,
-        boxl,
-        params.n_particles,
-        system.positions,
-        diameters;
-        mode="w",
-    )
+    # minimize(system, diameters, boxl; tolerance=1e-5)
+    # min_configuration = joinpath(pathname, "minimized.xyz")
+    # write_to_file(
+    #     min_configuration,
+    #     step,
+    #     boxl,
+    #     params.n_particles,
+    #     system.positions,
+    #     diameters;
+    #     mode="w",
+    # )
 
     # Also compress the trajectory file, if it exists
     if isfile(trajectory_file)
@@ -269,7 +267,7 @@ function read_minimize(params::Parameters, pathname; from_file="")
     current_energy = system.energy_and_forces.energy
     println("Initial energy: $(current_energy)")
 
-    minimize(system, diameters, boxl)
+    minimize(system, diameters, boxl; tolerance=1e-6)
 
     # Zero out arrays
     reset_output!(system.energy_and_forces)
@@ -301,7 +299,7 @@ function main()
     # Read the density from the command line
     densities = parse(Float64, ARGS[1])
     ktemp = 1.4671
-    n_particles = 2^11
+    n_particles = 2^10
     polydispersity = 0.15
     dt = 0.0001
 
@@ -313,13 +311,19 @@ function main()
             "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
         )
         mkpath(pathname)
+        # restartpath = joinpath(
+        #     @__DIR__,
+        #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
+        # )
+        # mkpath(restartpath)
         # Restart from a previous file
+        # initial_conf_path = joinpath(pathname, "final.xyz")
         simulation(
             params,
             pathname;
             # from_file=initial_conf_path,
-            eq_steps=10_000_000,
-            prod_steps=100_000_000,
+            eq_steps=100_000,
+            prod_steps=1_000_000,
         )
         # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
     end

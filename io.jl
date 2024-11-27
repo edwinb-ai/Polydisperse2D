@@ -29,6 +29,36 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
     return nothing
 end
 
+function write_to_file_lammps(filepath, step, boxl, n_particles, positions, diameters; mode="w")
+    # Write to file
+    open(filepath, mode) do io
+        Printf.@printf(
+            io,
+            "ITEM: TIMESTEP\n%d\n",
+            step
+        )
+        Printf.@printf(io,"ITEM: NUMBER OF ATOMS\n%d\n", n_particles)
+        Printf.@printf(io,"ITEM: BOX BOUNDS pp pp pp\n0.0 %lf\n0.0 %lf\n0.0 0.0\nITEM: ATOMS id type xu yu zu\n", boxl, boxl)
+        for i in eachindex(diameters, positions)
+            particle = positions[i]
+            # velocity = velocities[i]
+            Printf.@printf(
+                io,
+                "%d %d %lf %lf %lf\n",
+                1,
+                i,
+                diameters[i] / 2.0,
+                particle[1],
+                particle[2],
+                # velocity[1],
+                # velocity[2],
+            )
+        end
+    end
+
+    return nothing
+end
+
 function read_file(filepath)
     # Initialize the variables with a default value
     n_particles = 0
