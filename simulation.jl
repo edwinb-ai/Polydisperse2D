@@ -9,6 +9,8 @@ struct SimulationState{T,U,V}
     boxl::Float64
     # The container for the velocities
     velocities::Vector{SVector{2,Float64}}
+    # The images for the particles
+    images::Vector{SVector{2,Float64}}
 end
 
 function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="")
@@ -20,7 +22,7 @@ function initialize_state(params::Parameters, ktemp::Float64, pathname; from_fil
     nf = dimension * (params.n_particles - 1.0)
 
     # Initialize the system
-    (system, diameters, volume, boxl) = initialize_simulation(
+    (system, diameters, boxl) = initialize_simulation(
         params, pathname; polydispersity=params.polydispersity, file=from_file
     )
     # Initialize the velocities of the system by having the correct temperature
@@ -32,18 +34,16 @@ function initialize_state(params::Parameters, ktemp::Float64, pathname; from_fil
     # Zero out the arrays
     reset_output!(system.energy_and_forces)
 
-    state = SimulationState(system, diameters, rng, boxl, velocities)
+    # Initialize the array of images
+    images = [@SVector zeros(dimension) for _ in eachindex(velocities)]
+
+    state = SimulationState(system, diameters, rng, boxl, velocities, images)
 
     return state
 end
 
 function ensemble_step!(
-    ::NVE,
-    velocities,
-    energy_and_forces,
-    params::Parameters,
-    nf::Float64,
-    state::SimulationState,
+    ::NVE, velocities, params::Parameters, nf::Float64, state::SimulationState
 )
     kinetic_energy = compute_kinetic(velocities)
     temperature = 2.0 * kinetic_energy / nf
@@ -51,12 +51,7 @@ function ensemble_step!(
 end
 
 function ensemble_step!(
-    ensemble::NVT,
-    velocities,
-    energy_and_forces,
-    params::Parameters,
-    nf::Float64,
-    state::SimulationState,
+    ensemble::NVT, velocities, params::Parameters, nf::Float64, state::SimulationState
 )
     # Apply thermostat, e.g., Bussi thermostat
     bussi!(velocities, ensemble.ktemp, nf, params.dt, ensemble.tau, state.rng)
@@ -140,9 +135,7 @@ function run_simulation!(
         integrate_second_half!(velocities, system.energy_and_forces.forces, params.dt)
 
         # Apply ensemble-specific logic
-        temperature = ensemble_step!(
-            ensemble, velocities, system.energy_and_forces, params, nf, state
-        )
+        temperature = ensemble_step!(ensemble, velocities, params, nf, state)
 
         # Accumulate values for thermodynamics
         if mod(step, 10) == 0

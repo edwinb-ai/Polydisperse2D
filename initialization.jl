@@ -79,13 +79,11 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
     diameters = []
     positions = []
     boxl = 0.0
-    volume = 0.0
     system = nothing
 
     if isfile(file)
         @info "Reading from file..."
         (boxl, positions, diameters) = read_file(file)
-        volume = boxl^2
 
         # Initialize system
         system = CellListMap.ParticleSystem(;
@@ -109,7 +107,6 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
 
         # Now we compute the effective size of the box
         boxl = sqrt(sum(diameters .^ 2) / params.ρ)
-        volume = boxl^2
 
         # Initialize the system in a lattice configuration
         (system, diameters) = init_system(
@@ -117,7 +114,7 @@ function initialize_simulation(params::Parameters, pathname; polydispersity=0.11
         )
     end
 
-    return system, diameters, volume, boxl
+    return system, diameters, boxl
 end
 
 function initialize_velocities(ktemp, nf, rng, n_particles)
