@@ -16,7 +16,6 @@ const a_param = 134.5526623421209
 
 struct Parameters
     ρ::Float64
-    ktemp::Float64
     n_particles::Int
     polydispersity::Float64
     dt::Float64
@@ -28,34 +27,8 @@ include("thermostat.jl")
 include("pairwise.jl")
 include("io.jl")
 include("minimize.jl")
-
-function integrate_half!(
-    positions, velocities, forces, dt::Float64, boxl::Float64; pbc=true
-)
-    for i in eachindex(positions, forces, velocities)
-        f = forces[i]
-        x = positions[i]
-        v = velocities[i]
-        # ! Important: There is a mass in the force term
-        velocities[i] = @. v + (f * dt / 2.0)
-        positions[i] = @. x + (velocities[i] * dt)
-        if pbc
-            positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
-        end
-    end
-
-    return nothing
-end
-
-function integrate_second_half!(velocities, forces, dt)
-    for i in eachindex(velocities, forces)
-        f = forces[i]
-        v = velocities[i]
-        velocities[i] = @. v + (f * dt / 2.0)
-    end
-
-    return nothing
-end
+include("integrate.jl")
+include("simulation.jl")
 
 function simulation(
     params::Parameters, pathname; from_file="", eq_steps=100, prod_steps=500
@@ -78,7 +51,7 @@ function simulation(
 
     # Parameters for saving configurations to disk
     pbc = true
-    snapshot_times = vec(readdlm("new-log-times.txt", Int64; skipstart = 1))
+    snapshot_times = vec(readdlm("new-log-times.txt", Int64; skipstart=1))
     insert!(snapshot_times, 1, 0)
     current_snapshot_index = 1
     current_step = 0
@@ -106,7 +79,7 @@ function simulation(
 
     # The main loop of the simulation
     for step in 1:(eq_steps + prod_steps)
-        
+
         # First half of the integration
         integrate_half!(
             system.positions, velocities, system.energy_and_forces.forces, dt, boxl; pbc=pbc
@@ -145,7 +118,12 @@ function simulation(
             pressure += params.ρ * average_temperature
             open(thermo_file, "a") do io
                 Printf.format(
-                    io, format_string, current_step + 1, ener_part, average_temperature, pressure
+                    io,
+                    format_string,
+                    current_step + 1,
+                    ener_part,
+                    average_temperature,
+                    pressure,
                 )
             end
 
@@ -214,10 +192,9 @@ function simulation(
 
     # Write the final configuration
     final_configuration = joinpath(pathname, "final.xyz")
-    step = eq_steps + prod_steps
     write_to_file(
         final_configuration,
-        step,
+        to,
         boxl,
         params.n_particles,
         system.positions,
@@ -295,36 +272,60 @@ function read_minimize(params::Parameters, pathname; from_file="")
     return nothing
 end
 
+# function main()
+#     # Read the density from the command line
+#     density = parse(Float64, ARGS[1])
+#     ktemp = 1.4671
+#     n_particles = 2^10
+#     polydispersity = 0.15
+#     dt = 0.0001
+
+#     params = Parameters(density, ktemp, n_particles, polydispersity, dt)
+#     # Create a new directory with these parameters
+#     pathname = joinpath(
+#         @__DIR__,
+#         "N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
+#     )
+#     mkpath(pathname)
+#     # restartpath = joinpath(
+#     #     @__DIR__,
+#     #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
+#     # )
+#     # mkpath(restartpath)
+#     # Restart from a previous file
+#     # initial_conf_path = joinpath(pathname, "final.xyz")
+#     simulation(
+#         params,
+#         pathname;
+#         # from_file=initial_conf_path,
+#         eq_steps=10_000_000,
+#         prod_steps=100_000_000,
+#     )
+#     # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
+
+#     return nothing
+# end
+
 function main()
     # Read the density from the command line
-    density = parse(Float64, ARGS[1])
+    # density = parse(Float64, ARGS[1])
+    density = 0.99
     ktemp = 1.4671
     n_particles = 2^10
     polydispersity = 0.15
     dt = 0.0001
 
-    params = Parameters(density, ktemp, n_particles, polydispersity, dt)
-    # Create a new directory with these parameters
+    params = Parameters(density, n_particles, polydispersity, dt)
     pathname = joinpath(
         @__DIR__,
-        "N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
+        "test_N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
     )
     mkpath(pathname)
-    # restartpath = joinpath(
-    #     @__DIR__,
-    #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
-    # )
-    # mkpath(restartpath)
-    # Restart from a previous file
-    # initial_conf_path = joinpath(pathname, "final.xyz")
-    simulation(
-        params,
-        pathname;
-        # from_file=initial_conf_path,
-        eq_steps=10_000_000,
-        prod_steps=100_000_000,
-    )
-    # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
+
+    # We initialize the state of the simulation
+    thermostat = NVT(ktemp, 100.0 * dt)
+    state = initialize_state(params, thermostat, pathname)
+    run_simulation!(state, params, thermostat, 10, pathname)
 
     return nothing
 end

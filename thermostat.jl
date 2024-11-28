@@ -1,3 +1,14 @@
+abstract type Ensemble end
+
+struct NVT <: Ensemble
+    # Target temperature
+    ktemp::Float64
+    # Damping constant
+    tau::Float64
+end
+
+struct NVE <: Ensemble end
+
 function andersen!(velocities, ktemp, const_val, rng)
     sigma = sqrt(ktemp)
 
@@ -62,11 +73,11 @@ end
 
 function compute_kinetic(velocities)
     kinetic_energy = 0.0
-    
+
     for i in eachindex(velocities)
         kinetic_energy += sum(abs2, velocities[i])
     end
-    
+
     kinetic_energy /= 2.0
 
     return kinetic_energy

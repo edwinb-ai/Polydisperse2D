@@ -29,16 +29,19 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
     return nothing
 end
 
-function write_to_file_lammps(filepath, step, boxl, n_particles, positions, diameters; mode="w")
+function write_to_file_lammps(
+    filepath, step, boxl, n_particles, positions, diameters; mode="w"
+)
     # Write to file
     open(filepath, mode) do io
+        Printf.@printf(io, "ITEM: TIMESTEP\n%d\n", step)
+        Printf.@printf(io, "ITEM: NUMBER OF ATOMS\n%d\n", n_particles)
         Printf.@printf(
             io,
-            "ITEM: TIMESTEP\n%d\n",
-            step
+            "ITEM: BOX BOUNDS pp pp pp\n0.0 %lf\n0.0 %lf\n0.0 0.0\nITEM: ATOMS id type xu yu zu\n",
+            boxl,
+            boxl
         )
-        Printf.@printf(io,"ITEM: NUMBER OF ATOMS\n%d\n", n_particles)
-        Printf.@printf(io,"ITEM: BOX BOUNDS pp pp pp\n0.0 %lf\n0.0 %lf\n0.0 0.0\nITEM: ATOMS id type xu yu zu\n", boxl, boxl)
         for i in eachindex(diameters, positions)
             particle = positions[i]
             # velocity = velocities[i]
@@ -112,14 +115,12 @@ function compress_gz(filepath)
     return nothing
 end
 
-function open_files(pathname)
+function open_files(pathname, traj_name, thermo_name)
     # Open files for trajectory and other things
-    trajectory_file = joinpath(pathname, "production.xyz")
-    eq_trajectory_file = joinpath(pathname, "equilibration.xyz")
-    thermo_file = joinpath(pathname, "thermo.txt")
-    eq_thermo_file = joinpath(pathname, "eq_thermo.txt")
+    trajectory_file = joinpath(pathname, traj_name)
+    thermo_file = joinpath(pathname, thermo_name)
 
-    files = [trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file]
+    files = [trajectory_file, thermo_file]
 
     for file in files
         if isfile(file)
@@ -127,5 +128,5 @@ function open_files(pathname)
         end
     end
 
-    return (trajectory_file, eq_trajectory_file, thermo_file, eq_thermo_file)
+    return (trajectory_file, thermo_file)
 end
