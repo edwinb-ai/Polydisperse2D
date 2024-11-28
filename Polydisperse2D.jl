@@ -137,7 +137,7 @@ function simulation(
         end
 
         # Every few steps we save thermodynamic quantities to disk
-        if mod(step, 10_000) == 0 && step > eq_steps
+        if mod(step, 100_000) == 0 && step > eq_steps
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
             average_temperature = kinetic_temperature / nprom
@@ -156,7 +156,7 @@ function simulation(
         end
 
         # Every few steps we save thermodynamic quantities to disk, equilibration
-        if mod(step, 10_000) == 0 && step <= eq_steps
+        if mod(step, 100_000) == 0 && step <= eq_steps
             ener_part = system.energy_and_forces.energy
             ener_part /= params.n_particles
             average_temperature = kinetic_temperature / nprom
@@ -175,7 +175,7 @@ function simulation(
         end
 
         # Save to disk the positions during equilibration
-        if mod(step, 10_000) == 0 && step <= eq_steps
+        if mod(step, 100_000) == 0 && step <= eq_steps
             # Write to file
             write_to_file(
                 eq_trajectory_file,
@@ -297,36 +297,34 @@ end
 
 function main()
     # Read the density from the command line
-    densities = parse(Float64, ARGS[1])
+    density = parse(Float64, ARGS[1])
     ktemp = 1.4671
     n_particles = 2^10
     polydispersity = 0.15
     dt = 0.0001
 
-    for d in densities
-        params = Parameters(densities[1], ktemp, n_particles, polydispersity, dt)
-        # Create a new directory with these parameters
-        pathname = joinpath(
-            @__DIR__,
-            "N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
-        )
-        mkpath(pathname)
-        # restartpath = joinpath(
-        #     @__DIR__,
-        #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", d))_Δ=$(@sprintf("%.2g", polydispersity))",
-        # )
-        # mkpath(restartpath)
-        # Restart from a previous file
-        # initial_conf_path = joinpath(pathname, "final.xyz")
-        simulation(
-            params,
-            pathname;
-            # from_file=initial_conf_path,
-            eq_steps=100_000,
-            prod_steps=1_000_000,
-        )
-        # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
-    end
+    params = Parameters(density, ktemp, n_particles, polydispersity, dt)
+    # Create a new directory with these parameters
+    pathname = joinpath(
+        @__DIR__,
+        "N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
+    )
+    mkpath(pathname)
+    # restartpath = joinpath(
+    #     @__DIR__,
+    #     "restart_N=$(n_particles)_density=$(@sprintf("%.4g", density))_Δ=$(@sprintf("%.2g", polydispersity))",
+    # )
+    # mkpath(restartpath)
+    # Restart from a previous file
+    # initial_conf_path = joinpath(pathname, "final.xyz")
+    simulation(
+        params,
+        pathname;
+        # from_file=initial_conf_path,
+        eq_steps=10_000_000,
+        prod_steps=100_000_000,
+    )
+    # read_minimize(params, pathname; from_file=joinpath(pathname, "final.xyz"))
 
     return nothing
 end

@@ -3,3 +3,6 @@ Manifest.toml
 *.png
 *.py
 output*
+# Results
+*.txt
+*.dat
