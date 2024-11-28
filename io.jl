@@ -30,7 +30,7 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
 end
 
 function write_to_file_lammps(
-    filepath, step, boxl, n_particles, positions, diameters; mode="w"
+    filepath, step, boxl, n_particles, positions, images, diameters; mode="w"
 )
     # Write to file
     open(filepath, mode) do io
@@ -38,23 +38,26 @@ function write_to_file_lammps(
         Printf.@printf(io, "ITEM: NUMBER OF ATOMS\n%d\n", n_particles)
         Printf.@printf(
             io,
-            "ITEM: BOX BOUNDS pp pp pp\n0.0 %lf\n0.0 %lf\n0.0 0.0\nITEM: ATOMS id type xu yu zu\n",
+            "ITEM: BOX BOUNDS pp pp pp\n0.0 %lf\n0.0 %lf\n0.0 0.0\nITEM: ATOMS id type diameter x y z xu yu zu\n",
             boxl,
             boxl
         )
-        for i in eachindex(diameters, positions)
+        for i in eachindex(diameters, positions, images)
             particle = positions[i]
-            # velocity = velocities[i]
+            image = images[i]
+            unwrapped = particle + image * boxl
             Printf.@printf(
                 io,
-                "%d %d %lf %lf %lf\n",
-                1,
+                "%d %d %lf %lf %lf %lf %lf %lf %lf\n",
                 i,
+                1,
                 diameters[i] / 2.0,
                 particle[1],
                 particle[2],
-                # velocity[1],
-                # velocity[2],
+                0.0,
+                unwrapped[1],
+                unwrapped[2],
+                0.0
             )
         end
     end

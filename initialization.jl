@@ -54,7 +54,7 @@ function init_system(boxl, cutoff, pathname, diameters; n_particles=2^8)
     (x, y) = initialize_lattice(n_particles, boxl)
 
     # Now we change the arrays to static versions of it
-    positions = [@SVector [i, j] for (i, j) in zip(x, y)]
+    positions = [StaticArrays.@SVector [i, j] for (i, j) in zip(x, y)]
 
     # Save the initial configuration to a file
     filepath = joinpath(pathname, "initial.xyz")

@@ -1,6 +1,17 @@
-function integrate_half!(
-    positions, velocities, forces, dt::Float64, boxl::Float64; pbc=true
-)
+function register_images_and_wrap!(x, image, boxl)
+    # Compute number of box crossings for each dimension
+    n_cross = floor.(x ./ boxl)
+
+    # Update the image vector
+    @. image += Int(n_cross)
+
+    # Wrap the position
+    wrapped_x = @. x - boxl * n_cross
+
+    return wrapped_x
+end
+
+function integrate_half!(positions, images, velocities, forces, dt::Float64, boxl::Float64)
     for i in eachindex(positions, forces, velocities)
         f = forces[i]
         x = positions[i]
@@ -8,9 +19,7 @@ function integrate_half!(
         # ! Important: There is a mass in the force term
         velocities[i] = @. v + (f * dt / 2.0)
         positions[i] = @. x + (velocities[i] * dt)
-        if pbc
-            positions[i] = @. positions[i] - boxl * round(positions[i] / boxl)
-        end
+        positions[i] = register_images_and_wrap!(positions[i], images[i], boxl)
     end
 
     return nothing

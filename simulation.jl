@@ -1,4 +1,4 @@
-struct SimulationState{T,U,V}
+struct SimulationState{T,U,V,W}
     # This field contains the cell lists for the system itself
     system::T
     # The array that contains the diameters of the particles
@@ -10,7 +10,7 @@ struct SimulationState{T,U,V}
     # The container for the velocities
     velocities::Vector{SVector{2,Float64}}
     # The images for the particles
-    images::Vector{SVector{2,Float64}}
+    images::Vector{W}
 end
 
 function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="")
@@ -35,7 +35,9 @@ function initialize_state(params::Parameters, ktemp::Float64, pathname; from_fil
     reset_output!(system.energy_and_forces)
 
     # Initialize the array of images
-    images = [@SVector zeros(dimension) for _ in eachindex(velocities)]
+    images = [
+        StaticArrays.@MVector zeros(Int32, Int(dimension)) for _ in eachindex(velocities)
+    ]
 
     state = SimulationState(system, diameters, rng, boxl, velocities, images)
 
@@ -69,7 +71,7 @@ function finalize_simulation!(
     params::Parameters,
 )
     final_configuration = joinpath(pathname, "final.xyz")
-    write_to_file(
+    return write_to_file(
         final_configuration,
         total_steps,
         state.boxl,
@@ -79,9 +81,9 @@ function finalize_simulation!(
         mode="w",
     )
 
-    if isfile(trajectory_file)
-        compress_gz(trajectory_file)
-    end
+    # if isfile(trajectory_file)
+    #     compress_gz(trajectory_file)
+    # end
 end
 
 function run_simulation!(
@@ -102,7 +104,7 @@ function run_simulation!(
     system = state.system
     velocities = state.velocities
     diameters = state.diameters
-    pbc = true
+    images = state.images
 
     # Degrees of freedom
     dimension = 2.0
@@ -120,11 +122,11 @@ function run_simulation!(
         # Perform integration
         integrate_half!(
             system.positions,
+            images,
             velocities,
             system.energy_and_forces.forces,
             params.dt,
-            state.boxl;
-            pbc=pbc,
+            state.boxl,
         )
         reset_output!(system.energy_and_forces)
         CellListMap.map_pairwise!(
@@ -157,18 +159,21 @@ function run_simulation!(
 
         # Output trajectory periodically
         if mod(step, frequency) == 0
-            write_to_file(
+            write_to_file_lammps(
                 trajectory_file,
                 step,
                 state.boxl,
                 params.n_particles,
                 system.positions,
-                diameters,
+                images,
+                diameters;
+                mode="a",
             )
         end
     end
 
     # Final output and cleanup
     finalize_simulation!(trajectory_file, pathname, total_steps, state, params)
+
     return nothing
 end
