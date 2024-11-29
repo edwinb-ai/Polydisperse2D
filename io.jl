@@ -1,3 +1,19 @@
+function save_log_times_to_file(
+    logs::Vector{Int}, logn::Int, logbase::Float64, filename::String
+)
+    open(filename, "w") do file
+        # Write metadata as a comment
+        write(file, "#maxsnap=$logn,base=$logbase\n")
+
+        # Write each log time
+        for log in logs
+            write(file, "$log\n")
+        end
+    end
+
+    return nothing
+end
+
 function generate_log_times(; max_iter::Int=10000, logn::Int=40, logbase::Float64=1.35)
     dtime = Int[]
     maxlog = floor(Int, logbase^logn)
@@ -11,6 +27,9 @@ function generate_log_times(; max_iter::Int=10000, logn::Int=40, logbase::Float6
 
     # Remove duplicates and sort the list
     logs = sort(unique(dtime))
+
+    # Save log to file
+    save_log_times_to_file(logs, logn, logbase, "new-log-times.txt")
 
     # Return the results
     return logs

@@ -127,10 +127,11 @@ function run_simulation!(
     # We check whether we want logarithmic scale, create variables that can be seen from outside the scope only if necessary
     if log_times
         local snapshot_times = generate_log_times()
+        insert!(snapshot_times, 1, 0)
         local current_snapshot_index = 1
     end
 
-    for step in 1:total_steps
+    for step in 0:(total_steps - 1)
         # Perform integration
         integrate_half!(
             system.positions,
@@ -185,13 +186,12 @@ function run_simulation!(
 
         if log_times
             snap_step = snapshot_times[current_snapshot_index]
-            snap_time = snap_step * params.dt
             if snap_step == step
                 # Write to file
                 filename = joinpath(pathname, "snapshot.$(snap_step)")
                 write_to_file_lammps(
                     filename,
-                    snap_time,
+                    snap_step,
                     state.boxl,
                     params.n_particles,
                     system.positions,

@@ -44,21 +44,21 @@ function main()
     # We initialize the state of the simulation
     thermostat = NVT(ktemp, 100.0 * dt)
     state = initialize_state(params, ktemp, pathname)
-    run_simulation!(
-        state, params, thermostat, 100_000, 1_000, pathname; compress=true, log_times=true
-    )
+    run_simulation!(state, params, thermostat, 1_000_000, 100_000, pathname; compress=true)
 
     # Now we do NVE
-    # run_simulation!(
-    #     state,
-    #     params,
-    #     NVE(),
-    #     100_000,
-    #     1_000,
-    #     pathname;
-    #     traj_name="production.xyz",
-    #     thermo_name="production.txt",
-    # )
+    run_simulation!(
+        state,
+        params,
+        NVE(),
+        1_000_000,
+        100_000,
+        pathname;
+        traj_name="production.xyz",
+        thermo_name="production_thermo.txt",
+        log_times=true,
+        compress=true,
+    )
 
     return nothing
 end
