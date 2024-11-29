@@ -10,10 +10,6 @@ using CodecZlib
 using CellListMap
 import CellListMap: copy_output, reset_output!, reducer
 
-# Some numerical constants
-const b_param = 1.0204081632653061
-const a_param = 134.5526623421209
-
 struct Parameters
     ρ::Float64
     n_particles::Int

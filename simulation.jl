@@ -11,6 +11,10 @@ struct SimulationState{T,U,V,W}
     velocities::Vector{SVector{2,Float64}}
     # The images for the particles
     images::Vector{W}
+    # The dimension of the system
+    dimension::Int
+    # The degrees of freedom
+    nf::Float64
 end
 
 function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="")
@@ -18,7 +22,7 @@ function initialize_state(params::Parameters, ktemp::Float64, pathname; from_fil
 
     # The degrees of freedom
     # Spatial dimension, in this case 2D simulations
-    dimension = 2.0
+    dimension = 2
     nf = dimension * (params.n_particles - 1.0)
 
     # Initialize the system
@@ -39,7 +43,7 @@ function initialize_state(params::Parameters, ktemp::Float64, pathname; from_fil
         StaticArrays.@MVector zeros(Int32, Int(dimension)) for _ in eachindex(velocities)
     ]
 
-    state = SimulationState(system, diameters, rng, boxl, velocities, images)
+    state = SimulationState(system, diameters, rng, boxl, velocities, images, dimension, nf)
 
     return state
 end
@@ -105,10 +109,8 @@ function run_simulation!(
     velocities = state.velocities
     diameters = state.diameters
     images = state.images
-
-    # Degrees of freedom
-    dimension = 2.0
-    nf = dimension * (params.n_particles - 1.0)
+    dimension = state.dimension
+    nf = state.nf
 
     # Compute the volume
     volume = state.boxl^dimension

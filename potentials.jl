@@ -1,3 +1,7 @@
+# Some numerical constants
+const b_param = 1.0204081632653061
+const a_param = 134.5526623421209
+
 FastPow.@fastpow function pseudohs(rij, sigma=1.0; lambda=50.0)
     cutoff = b_param * sigma
 

@@ -1,3 +1,21 @@
+function generate_log_times(logn::Int, logbase::Float64, max_iter::Int)
+    dtime = Int[]
+    maxlog = floor(Int, logbase^logn)
+
+    for j in 0:max_iter
+        for i in 0:logn
+            dt = floor(Int, j * maxlog + logbase^i)
+            push!(dtime, dt)
+        end
+    end
+
+    # Remove duplicates and sort the list
+    logs = sort(unique(dtime))
+
+    # Return the results
+    return logs
+end
+
 function write_to_file(filepath, step, boxl, n_particles, positions, diameters; mode="a")
     # Write to file
     open(filepath, mode) do io
@@ -11,7 +29,6 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
         )
         for i in eachindex(diameters, positions)
             particle = positions[i]
-            # velocity = velocities[i]
             Printf.@printf(
                 io,
                 "%d %d %lf %lf %lf\n",
@@ -20,8 +37,6 @@ function write_to_file(filepath, step, boxl, n_particles, positions, diameters; 
                 diameters[i] / 2.0,
                 particle[1],
                 particle[2],
-                # velocity[1],
-                # velocity[2],
             )
         end
     end
