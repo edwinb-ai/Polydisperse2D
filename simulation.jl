@@ -17,12 +17,10 @@ struct SimulationState{T,U,V,W}
     nf::Float64
 end
 
-function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="")
+function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="", dimension=2)
     rng = Random.Xoshiro()
 
     # The degrees of freedom
-    # Spatial dimension, in this case 2D simulations
-    dimension = 2
     nf = dimension * (params.n_particles - 1.0)
 
     # Initialize the system
