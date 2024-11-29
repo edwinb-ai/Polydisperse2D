@@ -82,3 +82,10 @@ function compute_kinetic(velocities)
 
     return kinetic_energy
 end
+
+function compute_temperature(velocities, nf)
+    kinetic_energy = compute_kinetic(velocities)
+    temperature = 2.0 * kinetic_energy / nf
+    
+    return temperature
+end

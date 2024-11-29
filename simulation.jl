@@ -17,7 +17,13 @@ struct SimulationState{T,U,V,W}
     nf::Float64
 end
 
-function initialize_state(params::Parameters, ktemp::Float64, pathname; from_file="", dimension=2)
+function initialize_state(
+    params::Parameters,
+    ktemp::Float64,
+    pathname::String;
+    from_file::String="",
+    dimension::Int=2,
+)
     rng = Random.Xoshiro()
 
     # The degrees of freedom
@@ -49,9 +55,7 @@ end
 function ensemble_step!(
     ::NVE, velocities, params::Parameters, nf::Float64, state::SimulationState
 )
-    kinetic_energy = compute_kinetic(velocities)
-    temperature = 2.0 * kinetic_energy / nf
-    return temperature
+    return compute_temperature(velocities, nf)
 end
 
 function ensemble_step!(
@@ -59,10 +63,7 @@ function ensemble_step!(
 )
     # Apply thermostat, e.g., Bussi thermostat
     bussi!(velocities, ensemble.ktemp, nf, params.dt, ensemble.tau, state.rng)
-
-    kinetic_energy = compute_kinetic(velocities)
-    temperature = 2.0 * kinetic_energy / nf
-    return temperature
+    return compute_temperature(velocities, nf)
 end
 
 function finalize_simulation!(
@@ -71,10 +72,10 @@ function finalize_simulation!(
     total_steps::Int,
     state::SimulationState,
     params::Parameters,
-    compress=false,
+    compress::Bool=false,
 )
     final_configuration = joinpath(pathname, "final.xyz")
-    return write_to_file(
+    write_to_file(
         final_configuration,
         total_steps,
         state.boxl,
@@ -87,6 +88,8 @@ function finalize_simulation!(
     if compress && isfile(trajectory_file)
         compress_gz(trajectory_file)
     end
+
+    return nothing
 end
 
 function run_simulation!(
@@ -98,6 +101,7 @@ function run_simulation!(
     pathname;
     traj_name="trajectory.xyz",
     thermo_name="thermo.txt",
+    compress::Bool=false,
 )
     # Remove the files if they existed, and return the files handles
     (trajectory_file, thermo_file) = open_files(pathname, traj_name, thermo_name)
@@ -174,7 +178,7 @@ function run_simulation!(
     end
 
     # Final output and cleanup
-    finalize_simulation!(trajectory_file, pathname, total_steps, state, params)
+    finalize_simulation!(trajectory_file, pathname, total_steps, state, params, compress)
 
     return nothing
 end
