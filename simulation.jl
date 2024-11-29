@@ -102,6 +102,7 @@ function run_simulation!(
     traj_name="trajectory.xyz",
     thermo_name="thermo.txt",
     compress::Bool=false,
+    log_times::Bool=false,
 )
     # Remove the files if they existed, and return the files handles
     (trajectory_file, thermo_file) = open_files(pathname, traj_name, thermo_name)
@@ -122,6 +123,12 @@ function run_simulation!(
     virial = 0.0
     nprom = 0
     kinetic_temperature = 0.0
+
+    # We check whether we want logarithmic scale, create variables
+    if log_times
+        local snapshot_times = generate_log_times()
+        local current_snapshot_index = 1
+    end
 
     for step in 1:total_steps
         # Perform integration
@@ -174,6 +181,26 @@ function run_simulation!(
                 diameters;
                 mode="a",
             )
+        end
+
+        if log_times
+            snap_step = snapshot_times[current_snapshot_index]
+            snap_time = snap_step * params.dt
+            if snap_step == step
+                # Write to file
+                filename = joinpath(pathname, "snapshot.$(snap_step)")
+                write_to_file_lammps(
+                    filename,
+                    snap_time,
+                    state.boxl,
+                    params.n_particles,
+                    system.positions,
+                    images,
+                    diameters;
+                    mode="w",
+                )
+                current_snapshot_index += 1
+            end
         end
     end
 

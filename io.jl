@@ -1,4 +1,4 @@
-function generate_log_times(logn::Int, logbase::Float64, max_iter::Int)
+function generate_log_times(; max_iter::Int=10000, logn::Int=40, logbase::Float64=1.35)
     dtime = Int[]
     maxlog = floor(Int, logbase^logn)
 
