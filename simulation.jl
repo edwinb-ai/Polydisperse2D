@@ -71,6 +71,7 @@ function finalize_simulation!(
     total_steps::Int,
     state::SimulationState,
     params::Parameters,
+    compress=false,
 )
     final_configuration = joinpath(pathname, "final.xyz")
     return write_to_file(
@@ -83,9 +84,9 @@ function finalize_simulation!(
         mode="w",
     )
 
-    # if isfile(trajectory_file)
-    #     compress_gz(trajectory_file)
-    # end
+    if compress && isfile(trajectory_file)
+        compress_gz(trajectory_file)
+    end
 end
 
 function run_simulation!(
