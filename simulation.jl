@@ -124,7 +124,7 @@ function run_simulation!(
     nprom = 0
     kinetic_temperature = 0.0
 
-    # We check whether we want logarithmic scale, create variables
+    # We check whether we want logarithmic scale, create variables that can be seen from outside the scope only if necessary
     if log_times
         local snapshot_times = generate_log_times()
         local current_snapshot_index = 1
