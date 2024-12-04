@@ -6,3 +6,5 @@ output*
 # Results
 *.txt
 *.dat
+# Always ignore VSCode stuff
+.vscode/
